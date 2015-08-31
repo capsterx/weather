@@ -1,7 +1,7 @@
 source scripts/sockets.tcl
 source scripts/json.tcl
 
-namespace eval wsjon {
+namespace eval wjson {
   variable apikey ""
   variable conditions [list "\037%{current_observation/display_location/full}\037 \002Conditions\002: %{current_observation/weather} \002Temp\002: %{current_observation/temperature_string} \002Feels Like\002: %{current_observation/feelslike_string}  \002Humidity\002: %{current_observation/relative_humidity} \002Wind\002: %{current_observation/wind_string}  %{current_observation/observation_time} \002Sunrise\002: %{sun_phase/sunrise/hour}:%{sun_phase/sunrise/minute} \002Sunset\002: %{sun_phase/sunset/hour}:%{sun_phase/sunset/minute}" "conditions" "astronomy"]
   variable forecast [list "\002%{forecast/txt_forecast/forecastday<0>/title}\002 %{forecast/txt_forecast/forecastday<0>/fcttext}
@@ -16,7 +16,7 @@ namespace eval wsjon {
   variable textf ""
 }
 
-proc wsjon::textsplit {text limit} {
+proc wjson::textsplit {text limit} {
   set text [split $text " "]
   set tokens [llength $text]
   set start 0
@@ -33,7 +33,7 @@ proc wsjon::textsplit {text limit} {
   return $return
 }
 
-proc wsjon::msg {chan logo textf text} {
+proc wjson::msg {chan logo textf text} {
   set text [textsplit $text 50]
   set counter 0
   while {$counter <= [llength $text]} {
@@ -45,7 +45,7 @@ proc wsjon::msg {chan logo textf text} {
   }
 }
 
-proc wsjon::__callback {code args} {
+proc wjson::__callback {code args} {
  if {![string is boolean "$code"]} {
    if {[catch {uplevel #0 [concat $code $args]} err]} {
      putlog "Error $err"
@@ -53,7 +53,7 @@ proc wsjon::__callback {code args} {
  }
 }
 
-proc wsjon::handle_url_socket {host uri type sock {arg ""}} { 
+proc wjson::handle_url_socket {host uri type sock {arg ""}} { 
    set data [ sock::Get $sock data ]
    #upvar $data_ data
 
@@ -96,14 +96,14 @@ proc wsjon::handle_url_socket {host uri type sock {arg ""}} {
    sock::Set $sock data $data
 }
 
-proc wsjon::async_url_fetch {host port url next_url json} {
-   set sock [sock::Connect $host $port onAll [list wsjon::handle_url_socket $host $url]] 
+proc wjson::async_url_fetch {host port url next_url json} {
+   set sock [sock::Connect $host $port onAll [list wjson::handle_url_socket $host $url]] 
    sock::Set $sock data ""
    sock::Set $sock json $json
    sock::Set $sock next $next_url
 }
 
-proc wsjon::parse_conditions {ircdata json} {
+proc wjson::parse_conditions {ircdata json} {
   set output_string [dict get $ircdata formatstr]
   #set data [dict get $json [dict get $ircdata "datakey"]]
   set data $json
@@ -133,11 +133,11 @@ proc wsjon::parse_conditions {ircdata json} {
     set output_string [regsub -all $var $output_string $d]
   }
   foreach m [split $output_string "\n"] {
-    msg [dict get $ircdata channel] $wsjon::logo ${wjson::textf} $m
+    msg [dict get $ircdata channel] $wjson::logo ${wjson::textf} $m
   }
 }
 
-proc wsjon::autocomplete {ircdata json} {
+proc wjson::autocomplete {ircdata json} {
   set results {}
   foreach result [lindex $json 1] {
     if {[dict exists $result type] && [dict get $result type] == "city"} {
@@ -145,7 +145,7 @@ proc wsjon::autocomplete {ircdata json} {
     }
   }
   if {[llength $results] == 0} {
-    msg [dict get $ircdata channel] $wsjon::logo ${wjson::textf} "No results found"
+    msg [dict get $ircdata channel] $wjson::logo ${wjson::textf} "No results found"
     return
   } elseif {[llength $results] > 1} {
     set cities {}
@@ -155,35 +155,35 @@ proc wsjon::autocomplete {ircdata json} {
     set str "Found more than one result: '" 
     append str [join $cities "', '"]
     append str "'"
-    msg [dict get $ircdata channel] $wsjon::logo ${wjson::textf} $str
+    msg [dict get $ircdata channel] $wjson::logo ${wjson::textf} $str
     return
   } else {
     set loc [dict get [lindex $results 0] l]
     set urlkey [dict get $ircdata "urlkey"]
-    async_url_fetch "api.wunderground.com" 80 "/api/$wsjon::apikey/$urlkey/$loc.json" [list wjson::parse_conditions $ircdata]
+    async_url_fetch "api.wunderground.com" 80 "/api/$wjson::apikey/$urlkey/$loc.json" [list wjson::parse_conditions $ircdata]
   }
 }
 
-proc wsjon::urlencode {string} {
+proc wjson::urlencode {string} {
   regsub -all {^\{|\}$} $string "" string
   return [subst [regsub -nocase -all {([^a-z0-9\+])} $string {%[format %x [scan "\\&" %c]]}]]
 }
 
-proc wsjon::query_conditions {ircdata query json} {
+proc wjson::query_conditions {ircdata query json} {
   parse_conditions $ircdata $json
 }
 
-proc wsjon::fetch_url {key keys ircdata query function json} {
+proc wjson::fetch_url {key keys ircdata query function json} {
   if {[llength $keys] == 0} {
     putlog "last fetch $key"
-    async_url_fetch "api.wunderground.com" 80 "/api/$wsjon::apikey/$key/q/$query.json" [list $function $ircdata $query] $json
+    async_url_fetch "api.wunderground.com" 80 "/api/$wjson::apikey/$key/q/$query.json" [list $function $ircdata $query] $json
   } else {
     putlog "fetching $key"
-    async_url_fetch "api.wunderground.com" 80 "/api/$wsjon::apikey/$key/q/$query.json" [list wsjon::fetch_urls $keys $ircdata $query $function] $json
+    async_url_fetch "api.wunderground.com" 80 "/api/$wjson::apikey/$key/q/$query.json" [list wjson::fetch_urls $keys $ircdata $query $function] $json
   }
 }
 
-proc wsjon::fetch_urls {keys ircdata query function json} {
+proc wjson::fetch_urls {keys ircdata query function json} {
   set current_key [lindex $keys 0]
   set keys [lrange $keys 1 end]
   set response [list]
@@ -193,32 +193,32 @@ proc wsjon::fetch_urls {keys ircdata query function json} {
   putlog "error: [dict exists $response "error"]"
   putlog "results: [dict exists $response "results"]"
   if {[dict exists $response "error"]} {
-    async_url_fetch "autocomplete.wunderground.com" 80 "/aq?query=$query" [list wsjon::autocomplete $ircdata] [list]
+    async_url_fetch "autocomplete.wunderground.com" 80 "/aq?query=$query" [list wjson::autocomplete $ircdata] [list]
   } elseif {[dict exists $response "results"]} {
-    async_url_fetch "autocomplete.wunderground.com" 80 "/aq?query=$query" [list wsjon::autocomplete $ircdata] [list]
+    async_url_fetch "autocomplete.wunderground.com" 80 "/aq?query=$query" [list wjson::autocomplete $ircdata] [list]
   } else {
-    wsjon::fetch_url $current_key $keys $ircdata $query $function $json
+    wjson::fetch_url $current_key $keys $ircdata $query $function $json
   }
 }
 
-proc wsjon::get_weather {query ircdata} { 
+proc wjson::get_weather {query ircdata} { 
    set query [urlencode $query]
    set keys [dict get $ircdata "keys"]
    set function [dict get $ircdata "function"]
    fetch_urls $keys $ircdata $query $function [list]
 } 
 
-proc wsjon::egg_get_weather {nick host handle channel text} {
-  set fmt [lindex $wsjon::conditions 0]
-  set keys [lrange $wsjon::conditions 1 end]
-  get_weather $text [list nick $nick host $host handle $handle channel $channel formatstr $fmt keys $keys function wsjon::query_conditions]
+proc wjson::egg_get_weather {nick host handle channel text} {
+  set fmt [lindex $wjson::conditions 0]
+  set keys [lrange $wjson::conditions 1 end]
+  get_weather $text [list nick $nick host $host handle $handle channel $channel formatstr $fmt keys $keys function wjson::query_conditions]
 }
 
-proc wsjon::egg_get_weather_forcast {nick host handle channel text} {
-  set fmt [lindex $wsjon::forecast 0]
-  set keys [lrange $wsjon::forecast 1 end]
-  get_weather $text [list nick $nick host $host handle $handle channel $channel formatstr $fmt keys $keys function wsjon::query_conditions]
+proc wjson::egg_get_weather_forcast {nick host handle channel text} {
+  set fmt [lindex $wjson::forecast 0]
+  set keys [lrange $wjson::forecast 1 end]
+  get_weather $text [list nick $nick host $host handle $handle channel $channel formatstr $fmt keys $keys function wjson::query_conditions]
 }
 
-bind pub -|- .wz wsjon::egg_get_weather
-bind pub -|- .wzf wsjon::egg_get_weather_forcast
+bind pub -|- .wz wjson::egg_get_weather
+bind pub -|- .wzf wjson::egg_get_weather_forcast
